@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Stack;
 
@@ -228,7 +229,7 @@ public class ConfigurationMetadataAnnotationProcessor extends AbstractProcessor 
 	private void processAnnotatedTypeElement(String prefix, TypeElement element, Stack<TypeElement> seen) {
 		String type = this.metadataEnv.getTypeUtils().getQualifiedName(element);
 		this.metadataCollector.add(ItemMetadata.newGroup(prefix, type, type, null));
-		processTypeElement(prefix, element, null, seen);
+		processTypeElement(prefix, element, null, seen, null);
 	}
 
 	private void processExecutableElement(String prefix, ExecutableElement element, Stack<TypeElement> seen) {
@@ -247,23 +248,25 @@ public class ConfigurationMetadataAnnotationProcessor extends AbstractProcessor 
 				}
 				else {
 					this.metadataCollector.add(group);
-					processTypeElement(prefix, typeElement, element, seen);
+					processTypeElement(prefix, typeElement, element, seen, null);
 				}
 			}
 		}
 	}
 
 	private void processTypeElement(String prefix, TypeElement element, ExecutableElement source,
-			Stack<TypeElement> seen) {
-		if (!seen.contains(element)) {
+									Stack<TypeElement> seen, Boolean hierarchicalNested) {
+		if (!seen.contains(element) && Objects.nonNull(element)) {
 			seen.push(element);
 			new PropertyDescriptorResolver(this.metadataEnv).resolve(element, source).forEach((descriptor) -> {
 				this.metadataCollector.add(descriptor.resolveItemMetadata(prefix, this.metadataEnv));
-				if (descriptor.isNested(this.metadataEnv)) {
+				boolean nested = Objects.isNull(hierarchicalNested) ? descriptor.isNested(this.metadataEnv) : hierarchicalNested;
+				if (nested) {
 					TypeElement nestedTypeElement = (TypeElement) this.metadataEnv.getTypeUtils()
-						.asElement(descriptor.getType());
+							.asElement(descriptor.getType());
 					String nestedPrefix = ConfigurationMetadata.nestedPrefix(prefix, descriptor.getName());
-					processTypeElement(nestedPrefix, nestedTypeElement, source, seen);
+
+					processTypeElement(nestedPrefix, nestedTypeElement, source, seen, true);
 				}
 			});
 			seen.pop();
